@@ -121,7 +121,3 @@ files2md() {
 
   rm -f "$tmp"
 }
-
-if [ "${0##*/}" = "files2md.zsh" ] && [ "${ZSH_EVAL_CONTEXT:-}" != "toplevel" ]; then
-  files2md "$@"
-fi
