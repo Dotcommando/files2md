@@ -30,8 +30,7 @@ Clone and add `bin` to your `PATH`:
 ```bash
 git clone https://github.com/Dotcommando/files2md.git
 cd files2md
-echo 'export PATH="$PWD/bin:$PATH"' >> ~/.zshrc
-exec zsh -l
+ABS="$(pwd -P)"; printf 'export PATH="%s/bin:$PATH"\n' "$ABS" >> ~/.zshrc; exec zsh -l
 ```
 
 Or source the function in your shell:
