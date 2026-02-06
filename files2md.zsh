@@ -1,11 +1,8 @@
-# files2md: gather code into Markdown and copy to clipboard (macOS, zsh)
-
 files2md() {
   local exts_csv="ts"
   local minext_csv=""
   local -a ignore_patterns
 
-  # Parse options: -ext, -min, -ignore / -x
   while [ $# -gt 0 ]; do
     case "$1" in
       -ext)
@@ -23,16 +20,9 @@ files2md() {
         local ignore_csv="$2"
         ignore_csv="$(printf "%s" "$ignore_csv" | tr -d '[:space:]')"
         if [ -n "$ignore_csv" ]; then
-          if [ -n "${ZSH_VERSION:-}" ]; then
-            local -a tmp_ignore
-            tmp_ignore=(${(s:,:)ignore_csv})
-            ignore_patterns+=("${tmp_ignore[@]}")
-          else
-            local IFS=','
-            local -a tmp_ignore
-            read -r -a tmp_ignore <<< "$ignore_csv"
-            ignore_patterns+=("${tmp_ignore[@]}")
-          fi
+          local -a tmp_ignore
+          tmp_ignore=(${(s:,:)ignore_csv})
+          ignore_patterns+=("${tmp_ignore[@]}")
         fi
         shift 2
         ;;
@@ -56,14 +46,8 @@ files2md() {
   minext_csv="$(printf "%s" "$minext_csv" | tr -d '[:space:]' | tr '[:upper:]' '[:lower:]')"
 
   local -a exts_arr minext_arr
-  if [ -n "${ZSH_VERSION:-}" ]; then
-    exts_arr=(${(s:,:)exts_csv}); exts_arr=(${(L)exts_arr})
-    minext_arr=(${(s:,:)minext_csv}); minext_arr=(${(L)minext_arr})
-  else
-    local IFS=','
-    read -r -a exts_arr <<< "$exts_csv"
-    read -r -a minext_arr <<< "$minext_csv"
-  fi
+  exts_arr=(${(s:,:)exts_csv}); exts_arr=(${(L)exts_arr})
+  minext_arr=(${(s:,:)minext_csv}); minext_arr=(${(L)minext_arr})
   [ ${#exts_arr[@]} -gt 0 ] || exts_arr=("ts")
 
   local tmp
@@ -105,11 +89,20 @@ files2md() {
     fi
   }
 
+  _max_tildes_run() {
+    perl -0777 -ne 'my $m=0; while(/(~+)/g){ my $l=length($1); $m=$l if $l>$m } print $m'
+  }
+
+  _mk_tilde_fence() {
+    local n="$1"
+    [ "$n" -lt 3 ] && n=3
+    perl -e 'print "~" x $ARGV[0]' "$n"
+  }
+
   _should_ignore() {
     local file="$1"
     local pat
     for pat in "${ignore_patterns[@]}"; do
-      # простая проверка "подстрока содержится в пути"
       if [ -n "$pat" ] && [[ "$file" == *"$pat"* ]]; then
         return 0
       fi
@@ -123,7 +116,15 @@ files2md() {
     ext="$(printf "%s" "$ext" | tr '[:upper:]' '[:lower:]')"
 
     printf "// %s\n\n" "$file" >> "$tmp"
-    printf '```\n' >> "$tmp"
+
+    local fence="~~~"
+    if [ "$ext" = "md" ] || [ "$ext" = "markdown" ]; then
+      local maxt
+      maxt="$(_max_tildes_run < "$file")"
+      fence="$(_mk_tilde_fence $((maxt + 1)))"
+    fi
+
+    printf '%s\n' "$fence" >> "$tmp"
 
     if _in_list "$ext" "${minext_arr[@]}"; then
       case "$ext" in
@@ -138,7 +139,7 @@ files2md() {
       cat -- "$file" >> "$tmp"
     fi
 
-    printf '\n```\n\n' >> "$tmp"
+    printf '\n%s\n\n' "$fence" >> "$tmp"
   }
 
   _has_ext() {
@@ -151,7 +152,6 @@ files2md() {
     return 1
   }
 
-  # 1) Сначала собираем все файлы в массив
   local -a all_files
   local -a pred
   pred+=( "(" )
@@ -182,7 +182,6 @@ files2md() {
     done
   done
 
-  # 2) Фильтруем игнорируемые файлы
   local -a filtered_files
   local f
   for f in "${all_files[@]}"; do
@@ -191,7 +190,6 @@ files2md() {
     fi
   done
 
-  # 3) Эмитим только отфильтрованный список
   local count=0
   for f in "${filtered_files[@]}"; do
     _emit "$f"
